@@ -106,14 +106,21 @@ jobs:
             -dname "CN=Android Debug,O=Android,C=US"
           sudo apt-get install -y apksigner
           shopt -s nullglob
-          apks=(android/app/build/outputs/apk/release/app-arm64-v8a-release.apk)
-          if [[ "${#apks[@]}" -ne 1 ]]; then
-            echo "Expected exactly one arm64 release APK, found: ${apks[*]}" >&2
+          apks=(android/app/build/outputs/apk/release/*.apk)
+          echo "Found APKs: ${apks[*]}"
+          target=""
+          for apk in "${apks[@]}"; do
+            if [[ "$apk" == *arm64* ]]; then target="$apk"; break; fi
+          done
+          if [[ -z "$target" && "${#apks[@]}" -eq 1 ]]; then target="${apks[0]}"; fi
+          if [[ -z "$target" ]]; then
+            echo "Could not pick one APK from: ${apks[*]}" >&2
             exit 1
           fi
+          echo "Signing $target"
           apksigner sign --ks "${{ runner.temp }}/debug.jks" \
             --ks-pass pass:android --key-pass pass:android --ks-key-alias androiddebugkey \
-            --out syncthing-android-arm64.apk "${apks[0]}"
+            --out syncthing-android-arm64.apk "$target"
           rm -f "${{ runner.temp }}/debug.jks"
       - name: Attach APK to prerelease
         env:
