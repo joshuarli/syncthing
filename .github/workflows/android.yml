@@ -80,7 +80,11 @@ jobs:
             unzip -q "commandlinetools-linux-${cmdline_tools}_latest.zip"
             rm "commandlinetools-linux-${cmdline_tools}_latest.zip"
             mv cmdline-tools latest
+            # yes(1) dies with SIGPIPE once sdkmanager exits; that must not
+            # fail the step under pipefail. sdkmanager itself still fails it.
+            set +o pipefail
             yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses
+            set -o pipefail
           fi
           echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platform-tools" "platforms;android-37" "ndk;$ndk_version"
