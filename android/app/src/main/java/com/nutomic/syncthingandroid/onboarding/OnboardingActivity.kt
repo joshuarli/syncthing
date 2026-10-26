@@ -57,6 +57,9 @@ class OnboardingActivity : ThemedAppCompatActivity() {
 
     companion object {
         private const val TAG = "OnboardingActivity"
+        // Fork: API 37 (Cinnamon Bun) symbols, compileSdk is 36.
+        private const val SDK_CINNAMON_BUN = 37
+        private const val PERMISSION_ACCESS_LOCAL_NETWORK = "android.permission.ACCESS_LOCAL_NETWORK"
         const val REQUEST_WRITE_STORAGE = 143
 
         // Key used to persist the whole UI state across configuration changes (e.g. rotation).
@@ -397,12 +400,12 @@ class OnboardingActivity : ThemedAppCompatActivity() {
     }
 
     private fun haveLocalNetworkPermission(): Boolean {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.CINNAMON_BUN) {
+        if (Build.VERSION.SDK_INT < SDK_CINNAMON_BUN) {
             return true
         }
         return ContextCompat.checkSelfPermission(
             this,
-            Manifest.permission.ACCESS_LOCAL_NETWORK
+            PERMISSION_ACCESS_LOCAL_NETWORK
         ) == PackageManager.PERMISSION_GRANTED
     }
 
@@ -443,10 +446,10 @@ class OnboardingActivity : ThemedAppCompatActivity() {
     }
 
     private fun requestLocalNetworkPermission() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.CINNAMON_BUN) {
+        if (Build.VERSION.SDK_INT < SDK_CINNAMON_BUN) {
             return
         }
-        localNetworkPermissionLauncher.launch(Manifest.permission.ACCESS_LOCAL_NETWORK)
+        localNetworkPermissionLauncher.launch(PERMISSION_ACCESS_LOCAL_NETWORK)
     }
 
     private fun startKeyGeneration() {
