@@ -45,11 +45,8 @@ jobs:
     permissions:
       contents: write
     env:
-      GRADLE_USER_HOME: ${{ runner.temp }}/.gradle
-      ANDROID_USER_HOME: ${{ runner.temp }}/.android
       ANDROID_HOME: ${{ github.workspace }}/android-sdk
       ANDROID_SDK_ROOT: ${{ github.workspace }}/android-sdk
-      GOMODCACHE: ${{ runner.temp }}/go-mod
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -65,6 +62,12 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
+      - name: Set temp-based environment
+        run: |
+          echo "GRADLE_USER_HOME=${{ runner.temp }}/.gradle" >> "$GITHUB_ENV"
+          echo "ANDROID_USER_HOME=${{ runner.temp }}/.android" >> "$GITHUB_ENV"
+          echo "GOMODCACHE=${{ runner.temp }}/go-mod" >> "$GITHUB_ENV"
+          mkdir -p "${{ runner.temp }}/.gradle" "${{ runner.temp }}/.android"
       - name: Install Android SDK and NDK
         run: |
           cmdline_tools=$(grep 'android-cmdline-tools = ' android/gradle/libs.versions.toml | cut -d '"' -f 2)
