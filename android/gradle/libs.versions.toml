@@ -1,10 +1,10 @@
 [versions]
 # Android SDK versions
 android-cmdline-tools = "11076708"
-compile-sdk = "37"
+compile-sdk = "36"
 min-sdk = "23"
 ndk-version = "30.0.16248370"
-target-sdk = "37"
+target-sdk = "36"
 
 # App version
 version-code = "2010700"

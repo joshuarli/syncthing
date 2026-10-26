@@ -72,6 +72,7 @@ jobs:
         run: |
           cmdline_tools=$(grep 'android-cmdline-tools = ' android/gradle/libs.versions.toml | cut -d '"' -f 2)
           ndk_version=$(grep 'ndk-version = ' android/gradle/libs.versions.toml | cut -d '"' -f 2)
+          sdk_level=$(grep 'compile-sdk = ' android/gradle/libs.versions.toml | cut -d '"' -f 2)
           echo "NDK_VERSION=$ndk_version" >> "$GITHUB_ENV"
           mkdir -p "$ANDROID_HOME/cmdline-tools"
           if [[ ! -d "$ANDROID_HOME/cmdline-tools/latest" ]]; then
@@ -87,7 +88,7 @@ jobs:
             set -o pipefail
           fi
           echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
-          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platform-tools" "platforms;android-37" "ndk;$ndk_version"
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platform-tools" "platforms;android-${sdk_level}" "ndk;$ndk_version"
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
