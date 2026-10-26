@@ -18,3 +18,13 @@ deb
 /repos
 /proto/scripts/protoc-gen-gosyncthing
 /compat.json
+
+# Android wrapper (vendored Syncthing-Fork, arm64-only)
+android/.gradle/
+android/app/build/
+android/app/src/main/jniLibs/
+android/build/
+android/local.properties
+android/syncthing/pkg/
+*.jks
+*.keystore

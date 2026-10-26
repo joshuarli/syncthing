@@ -1,0 +1,119 @@
+name: android
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: "${{ github.workflow }}-${{ github.head_ref || github.run_id }}"
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash -euo pipefail {0}
+
+jobs:
+  preflight:
+    name: Validate release ref
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      default_branch: ${{ steps.ref.outputs.default_branch }}
+    steps:
+      - name: Require the default branch
+        id: ref
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          default_branch=$(gh api "repos/$REPOSITORY" --jq '.default_branch')
+          if [[ "$EVENT_NAME" != workflow_dispatch || "$REF" != "refs/heads/$default_branch" ]]; then
+            echo "Android build rejected: expected workflow_dispatch on refs/heads/$default_branch, got $EVENT_NAME on $REF" >&2
+            exit 1
+          fi
+          echo "default_branch=$default_branch" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build and sign APK
+    needs: preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    env:
+      GRADLE_USER_HOME: ${{ runner.temp }}/.gradle
+      ANDROID_USER_HOME: ${{ runner.temp }}/.android
+      ANDROID_HOME: ${{ github.workspace }}/android-sdk
+      ANDROID_SDK_ROOT: ${{ github.workspace }}/android-sdk
+      GOMODCACHE: ${{ runner.temp }}/go-mod
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      # Hand-pinned: setup-java is outside the repomod approved catalog, which
+      # only covers the fork-checked stems (lint, prerelease, test). This file
+      # is intentionally not one of those, so fork policy ignores it.
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Install Android SDK and NDK
+        run: |
+          cmdline_tools=$(grep 'android-cmdline-tools = ' android/gradle/libs.versions.toml | cut -d '"' -f 2)
+          ndk_version=$(grep 'ndk-version = ' android/gradle/libs.versions.toml | cut -d '"' -f 2)
+          echo "NDK_VERSION=$ndk_version" >> "$GITHUB_ENV"
+          mkdir -p "$ANDROID_HOME/cmdline-tools"
+          if [[ ! -d "$ANDROID_HOME/cmdline-tools/latest" ]]; then
+            cd "$ANDROID_HOME/cmdline-tools"
+            wget -q "https://dl.google.com/android/repository/commandlinetools-linux-${cmdline_tools}_latest.zip"
+            unzip -q "commandlinetools-linux-${cmdline_tools}_latest.zip"
+            rm "commandlinetools-linux-${cmdline_tools}_latest.zip"
+            mv cmdline-tools latest
+            yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses
+          fi
+          echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platform-tools" "platforms;android-37" "ndk;$ndk_version"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ${{ runner.temp }}/.gradle/caches
+            ${{ runner.temp }}/.gradle/wrapper
+            ${{ runner.temp }}/go-mod
+          key: ${{ runner.os }}-android-${{ hashFiles('go.mod', 'go.sum', 'android/gradle/libs.versions.toml', 'android/**/*.gradle*', 'android/gradle/wrapper/gradle-wrapper.properties') }}
+      - name: Build release APK
+        working-directory: android
+        run: ./gradlew --no-daemon buildNative lintRelease assembleRelease
+      - name: Sign APK with fresh debug key
+        run: |
+          keytool -genkeypair -keystore "${{ runner.temp }}/debug.jks" -alias androiddebugkey \
+            -storepass android -keypass android -keyalg RSA -keysize 2048 -validity 10950 \
+            -dname "CN=Android Debug,O=Android,C=US"
+          sudo apt-get install -y apksigner
+          shopt -s nullglob
+          apks=(android/app/build/outputs/apk/release/app-arm64-v8a-release.apk)
+          if [[ "${#apks[@]}" -ne 1 ]]; then
+            echo "Expected exactly one arm64 release APK, found: ${apks[*]}" >&2
+            exit 1
+          fi
+          apksigner sign --ks "${{ runner.temp }}/debug.jks" \
+            --ks-pass pass:android --key-pass pass:android --ks-key-alias androiddebugkey \
+            --out syncthing-android-arm64.apk "${apks[0]}"
+          rm -f "${{ runner.temp }}/debug.jks"
+      - name: Attach APK to prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: release-${{ github.sha }}
+        run: |
+          if ! gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "No $RELEASE_TAG release yet; run the prerelease workflow on this commit first" >&2
+            exit 1
+          fi
+          gh release upload "$RELEASE_TAG" syncthing-android-arm64.apk --repo "$GITHUB_REPOSITORY" --clobber
