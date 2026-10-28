@@ -73,6 +73,17 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
+      - name: Compute fork version
+        run: |
+          app_version=$(grep 'version-name = ' android/gradle/libs.versions.toml | cut -d '"' -f 2)
+          base=$(echo "$app_version" | cut -d. -f1-3)
+          short=${GITHUB_SHA:0:12}
+          echo "FORK_VERSION=v${base}-fork-${short}" >> "$GITHUB_ENV"
+          echo "Fork version: v${base}-fork-${short}"
+          if ! [[ "v${base}-fork-${short}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-fork-[0-9a-f]+$ ]]; then
+            echo "Computed FORK_VERSION does not satisfy lib/build version regex" >&2
+            exit 1
+          fi
       - name: Generate GUI assets
         run: go generate ./lib/api/auto/
       - name: Build static release binary
@@ -81,14 +92,14 @@ jobs:
           CGO_ENABLED: 0
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
-        run: go build -trimpath -tags noupgrade -ldflags "-s -w -X github.com/syncthing/syncthing/lib/build.Version=release-${GITHUB_SHA}" -o "syncthing-${{ matrix.target }}" ./cmd/syncthing
+        run: go build -trimpath -tags noupgrade -ldflags "-s -w -X github.com/syncthing/syncthing/lib/build.Version=$FORK_VERSION" -o "syncthing-${{ matrix.target }}" ./cmd/syncthing
       - name: Build static Android binary
         if: matrix.goos == 'android'
         env:
           CGO_ENABLED: 0
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
-        run: go build -trimpath -tags noupgrade -ldflags "-s -w -checklinkname=0 -X github.com/syncthing/syncthing/lib/build.Version=release-${GITHUB_SHA}" -o "syncthing-${{ matrix.target }}" ./cmd/syncthing
+        run: go build -trimpath -tags noupgrade -ldflags "-s -w -checklinkname=0 -X github.com/syncthing/syncthing/lib/build.Version=$FORK_VERSION" -o "syncthing-${{ matrix.target }}" ./cmd/syncthing
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: syncthing-${{ matrix.target }}

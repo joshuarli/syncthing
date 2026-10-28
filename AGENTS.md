@@ -33,7 +33,11 @@ Contract properties, all load-bearing:
   with `PT_INTERP`/`DT_NEEDED` before publication.
 - All builds use `-tags noupgrade`: the fork must never self-upgrade against
   upstream `upgrades.syncthing.net` releases. `Version` is stamped with the
-  release tag (`-X .../lib/build.Version=release-${GITHUB_SHA}`).
+  fork version `v<base>-fork-<short-sha>` (`-X .../lib/build.Version=$FORK_VERSION`),
+  where `<base>` tracks `version-name` in `android/gradle/libs.versions.toml`
+  and `<short-sha>` is the first 12 hex of the built commit. The release tag
+  stays `release-<sha>`; only the stamped `Version` must satisfy
+  `lib/build`'s `^v\d+\.\d+\.\d+` check.
 - The Android build additionally passes `-checklinkname=0`. Reason:
   `github.com/wlynxg/anet` v0.0.5 (used only by
   `lib/netutil/interfaces_android.go`) linknames `net.zoneCache`, which Go
@@ -66,10 +70,11 @@ The application ID stays `com.github.catfriend1.syncthingfork`.
   sets `syncthing_dir` to the monorepo root, so core and wrapper can never skew.
   It passes `-no-upgrade` and `EXTRA_LDFLAGS=-checklinkname=0` (same anet/Go reason
   as the raw `android-arm64` prerelease binary).
-- Version plumbing: our tags are `release-<sha>`, not semver, so the script
-  skips the app-version match when `git describe` has no parseable version.
-  App `version-name`/`version-code` in `android/gradle/libs.versions.toml` are
-  still consistency-checked by Gradle itself.
+- Version plumbing: the native core version is `v<base>-fork-<short-sha>`
+  derived from `version-name` in `android/gradle/libs.versions.toml` plus the
+  built commit, so the app-version match stays enforced. Bump `version-name` /
+  `version-code` when rebasing onto a newer upstream; desktop prereleases read
+  the same base.
 - Toolchain: JDK 21 (Temurin), Android cmdline-tools + NDK 30 from the Gradle
   version catalog, Go from root `go.mod`. Bumping Go means editing `go.mod`
   AND `go_version` in `android/gradle/libs.versions.toml`.

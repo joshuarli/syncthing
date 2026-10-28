@@ -257,7 +257,7 @@ def verify_native_version_matches_app(project_dir, syncthing_version_raw):
     """Compare native version with app version and fail if mismatch."""
     native_version = try_extract_native_version(syncthing_version_raw)
     if native_version is None:
-        # Fork monorepo: tags are release-<sha>, not semver. The core and the
+        # Fork native version is v<base>-fork-<sha>; the core and the
         # wrapper always come from the same commit, so there is nothing to match.
         print('No semver in %r; skipping app version match (fork monorepo)' % syncthingVersion)
         return
@@ -358,30 +358,23 @@ if not os.environ.get('ANDROID_NDK_HOME', ''):
     fail('Error: ANDROID_NDK_HOME environment variable not defined')
 print('ANDROID_NDK_HOME=\'' + os.environ.get('ANDROID_NDK_HOME', '') + '\'')
 
-# Make sure all tags are available for git describe
-print('Invoking git fetch ...')
-subprocess.check_call([
-    'git',
-    '-C',
-    syncthing_dir,
-    'fetch',
-    '--tags'
-])
-
 subprocess.check_call([go_bin, 'env', '-w', 'GOFLAGS=-buildvcs=false'], cwd=syncthing_dir)
 
 if FORCE_DISPLAY_SYNCTHING_VERSION:
     syncthingVersion = FORCE_DISPLAY_SYNCTHING_VERSION.replace("rc", "preview")
 else:
-    print('Invoking git describe ...')
-    syncthingVersion = subprocess.check_output([
+    print('Deriving fork version from app version-name ...')
+    app_version_full = get_app_version(project_dir)
+    app_version = ".".join(app_version_full.split(".")[:3])
+    short_sha = subprocess.check_output([
         git_bin,
         '-C',
         syncthing_dir,
-        'describe',
-        '--always'
-    ]).strip()
-    syncthingVersion = syncthingVersion.decode().replace("rc", "preview")
+        'rev-parse',
+        '--short=12',
+        'HEAD',
+    ]).strip().decode()
+    syncthingVersion = f"v{app_version}-fork-{short_sha}"
 
 verify_native_version_matches_app(project_dir, syncthingVersion)
 
