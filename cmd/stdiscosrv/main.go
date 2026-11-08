@@ -21,8 +21,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/thejerf/suture/v4"
 
-	"github.com/syncthing/syncthing/internal/blob"
-	"github.com/syncthing/syncthing/internal/blob/s3"
 	"github.com/syncthing/syncthing/internal/slogutil"
 	"github.com/syncthing/syncthing/lib/build"
 	"github.com/syncthing/syncthing/lib/protocol"
@@ -73,12 +71,6 @@ type CLI struct {
 	DBDir           string        `group:"Database" help:"Database directory" default:"." env:"DISCOVERY_DB_DIR"`
 	DBFlushInterval time.Duration `group:"Database" help:"Interval between database flushes" default:"5m" env:"DISCOVERY_DB_FLUSH_INTERVAL"`
 
-	DBS3Endpoint    string `name:"db-s3-endpoint" group:"Database (S3 backup)" hidden:"true" help:"S3 endpoint for database" env:"DISCOVERY_DB_S3_ENDPOINT"`
-	DBS3Region      string `name:"db-s3-region" group:"Database (S3 backup)" hidden:"true" help:"S3 region for database" env:"DISCOVERY_DB_S3_REGION"`
-	DBS3Bucket      string `name:"db-s3-bucket" group:"Database (S3 backup)" hidden:"true" help:"S3 bucket for database" env:"DISCOVERY_DB_S3_BUCKET"`
-	DBS3AccessKeyID string `name:"db-s3-access-key-id" group:"Database (S3 backup)" hidden:"true" help:"S3 access key ID for database" env:"DISCOVERY_DB_S3_ACCESS_KEY_ID"`
-	DBS3SecretKey   string `name:"db-s3-secret-key" group:"Database (S3 backup)" hidden:"true" help:"S3 secret key for database" env:"DISCOVERY_DB_S3_SECRET_KEY"`
-
 	AMQPAddress string `group:"AMQP replication" hidden:"true" help:"Address to AMQP broker" env:"DISCOVERY_AMQP_ADDRESS"`
 
 	Debug   bool `short:"d" help:"Print debug output" env:"DISCOVERY_DEBUG"`
@@ -125,19 +117,8 @@ func main() {
 		Timeout:           2 * time.Minute,
 	})
 
-	// If configured, use blob storage for database backups.
-	var blobs blob.Store
-	var err error
-	if cli.DBS3Endpoint != "" {
-		blobs, err = s3.NewSession(cli.DBS3Endpoint, cli.DBS3Region, cli.DBS3Bucket, cli.DBS3AccessKeyID, cli.DBS3SecretKey)
-	}
-	if err != nil {
-		slog.Error("Failed to create blob store", "error", err)
-		os.Exit(1)
-	}
-
 	// Start the database.
-	db := newInMemoryStore(cli.DBDir, cli.DBFlushInterval, blobs)
+	db := newInMemoryStore(cli.DBDir, cli.DBFlushInterval)
 	main.Add(db)
 
 	// If we have an AMQP broker for replication, start that

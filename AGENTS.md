@@ -130,9 +130,9 @@ that is out of scope. Disable it via configuration instead:
   alternative), cel-go/protovalidate ~1.8 MB (security hardening, keep),
   quic-go ~0.6 MB (`noquic` exists but guts the transport), leveldb migration
   ~0.3 MB (`internal/db/olddb`, one-time use), kong CLI ~0.2 MB, prometheus
-  ~0.2 MB. aws-sdk-go, geoip, sentry, and the infra servers are not linked
-  into the main binary at all. The 32 MB `fips140/drbg` entry is BSS: free
-  on disk.
+  ~0.2 MB. geoip and sentry are not linked into the main binary at all; the
+  infra servers are not built or shipped. The 32 MB `fips140/drbg` entry is
+  BSS: free on disk.
 - Changing config defaults in `lib/config` (existing configs expand `default`
   keywords at runtime; changing defaults alters behavior for all users of this fork).
 - Adding CI workflows besides `prerelease.yml` and `android.yml`. Fork policy

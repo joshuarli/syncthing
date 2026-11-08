@@ -32,8 +32,6 @@ import (
 )
 
 var copyrightMap = map[string]string{
-	// https://github.com/aws/aws-sdk-go/blob/main/NOTICE.txt#L2
-	"aws/aws-sdk-go": "Copyright &copy; 2015 Amazon.com, Inc. or its affiliates, Copyright 2014-2015 Stripe, Inc",
 	// https://github.com/ccding/go-stun/blob/master/main.go#L1
 	"ccding/go-stun": "Copyright &copy; 2016 Cong Ding",
 	// https://github.com/search?q=repo%3Acertifi%2Fgocertifi%20copyright&type=code

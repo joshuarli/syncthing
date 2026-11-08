@@ -26,8 +26,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/puzpuzpuz/xsync/v3"
-	"github.com/syncthing/syncthing/internal/blob"
-	"github.com/syncthing/syncthing/internal/blob/s3"
 	"github.com/syncthing/syncthing/internal/slogutil"
 	"github.com/syncthing/syncthing/lib/build"
 	"github.com/syncthing/syncthing/lib/geoip"
@@ -42,12 +40,6 @@ type CLI struct {
 	GeoIPAccountID  int           `env:"UR_GEOIP_ACCOUNT_ID"`
 	DumpFile        string        `env:"UR_DUMP_FILE" default:"reports.jsons.gz"`
 	DumpInterval    time.Duration `env:"UR_DUMP_INTERVAL" default:"5m"`
-
-	S3Endpoint    string `name:"s3-endpoint" env:"UR_S3_ENDPOINT"`
-	S3Region      string `name:"s3-region" env:"UR_S3_REGION"`
-	S3Bucket      string `name:"s3-bucket" env:"UR_S3_BUCKET"`
-	S3AccessKeyID string `name:"s3-access-key-id" env:"UR_S3_ACCESS_KEY_ID"`
-	S3SecretKey   string `name:"s3-secret-key" env:"UR_S3_SECRET_KEY"`
 }
 
 var (
@@ -124,23 +116,6 @@ func (cli *CLI) Run() error {
 		go geo.Serve(context.TODO())
 	}
 
-	// Blob storage
-
-	var blobs blob.Store
-	if cli.S3Endpoint != "" {
-		blobs, err = s3.NewSession(cli.S3Endpoint, cli.S3Region, cli.S3Bucket, cli.S3AccessKeyID, cli.S3SecretKey)
-		if err != nil {
-			slog.Error("Failed to create S3 session", slogutil.Error(err))
-			return err
-		}
-	}
-
-	if _, err := os.Stat(cli.DumpFile); err != nil && blobs != nil {
-		if err := cli.downloadDumpFile(blobs); err != nil {
-			slog.Error("Failed to download dump file", slogutil.Error(err))
-		}
-	}
-
 	// server
 
 	srv := &server{
@@ -158,7 +133,7 @@ func (cli *CLI) Run() error {
 
 	go func() {
 		for range time.Tick(cli.DumpInterval) {
-			if err := cli.saveDumpFile(srv, blobs); err != nil {
+			if err := cli.saveDumpFile(srv); err != nil {
 				slog.Error("Failed to write dump file", slogutil.Error(err))
 			}
 		}
@@ -202,27 +177,7 @@ func (cli *CLI) Run() error {
 	return metricsSrv.Serve(urListener)
 }
 
-func (cli *CLI) downloadDumpFile(blobs blob.Store) error {
-	latestKey, err := blobs.LatestKey(context.Background())
-	if err != nil {
-		return fmt.Errorf("list latest S3 key: %w", err)
-	}
-	fd, err := os.Create(cli.DumpFile)
-	if err != nil {
-		return fmt.Errorf("create dump file: %w", err)
-	}
-	if err := blobs.Download(context.Background(), latestKey, fd); err != nil {
-		_ = fd.Close()
-		return fmt.Errorf("download dump file: %w", err)
-	}
-	if err := fd.Close(); err != nil {
-		return fmt.Errorf("close dump file: %w", err)
-	}
-	slog.Info("Dump file downloaded", "key", latestKey)
-	return nil
-}
-
-func (cli *CLI) saveDumpFile(srv *server, blobs blob.Store) error {
+func (cli *CLI) saveDumpFile(srv *server) error {
 	t0 := time.Now()
 	defer func() {
 		metricsWriteSecondsLast.Set(float64(time.Since(t0)))
@@ -247,21 +202,6 @@ func (cli *CLI) saveDumpFile(srv *server, blobs blob.Store) error {
 		return fmt.Errorf("renaming dump file: %w", err)
 	}
 	slog.Info("Dump file saved", "d", time.Since(t0).String())
-
-	if blobs != nil {
-		t1 := time.Now()
-		key := fmt.Sprintf("reports-%s.jsons.gz", time.Now().UTC().Format("2006-01-02"))
-		fd, err := os.Open(cli.DumpFile)
-		if err != nil {
-			return fmt.Errorf("opening dump file: %w", err)
-		}
-		if err := blobs.Upload(context.Background(), key, fd); err != nil {
-			return fmt.Errorf("uploading dump file: %w", err)
-		}
-		_ = fd.Close()
-		slog.Info("Dump file uploaded", "d", time.Since(t1).String())
-	}
-
 	return nil
 }
 

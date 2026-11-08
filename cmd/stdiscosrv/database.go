@@ -24,11 +24,9 @@ import (
 	"github.com/puzpuzpuz/xsync/v3"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/syncthing/syncthing/internal/blob"
 	"github.com/syncthing/syncthing/internal/gen/discosrv"
 	"github.com/syncthing/syncthing/internal/protoutil"
 	"github.com/syncthing/syncthing/lib/protocol"
-	"github.com/syncthing/syncthing/lib/rand"
 )
 
 type clock interface {
@@ -51,43 +49,17 @@ type inMemoryStore struct {
 	m             *xsync.MapOf[protocol.DeviceID, *discosrv.DatabaseRecord]
 	dir           string
 	flushInterval time.Duration
-	blobs         blob.Store
-	objKey        string
 	clock         clock
 }
 
-func newInMemoryStore(dir string, flushInterval time.Duration, blobs blob.Store) *inMemoryStore {
-	hn, err := os.Hostname()
-	if err != nil {
-		hn = rand.String(8)
-	}
+func newInMemoryStore(dir string, flushInterval time.Duration) *inMemoryStore {
 	s := &inMemoryStore{
 		m:             xsync.NewMapOf[protocol.DeviceID, *discosrv.DatabaseRecord](),
 		dir:           dir,
 		flushInterval: flushInterval,
-		blobs:         blobs,
-		objKey:        hn + ".db",
 		clock:         defaultClock{},
 	}
 	nr, err := s.read()
-	if os.IsNotExist(err) && blobs != nil {
-		// Try to read from blob storage
-		latestKey, cerr := blobs.LatestKey(context.Background())
-		if cerr != nil {
-			slog.Error("Failed to find database in blob storage", "error", cerr)
-			return s
-		}
-		fd, cerr := os.Create(filepath.Join(s.dir, "records.db"))
-		if cerr != nil {
-			slog.Error("Failed to create database file", "error", cerr)
-			return s
-		}
-		if cerr := blobs.Download(context.Background(), latestKey, fd); cerr != nil {
-			slog.Error("Failed to download database from blob storage", "error", cerr)
-		}
-		_ = fd.Close()
-		nr, err = s.read()
-	}
 	if err != nil {
 		slog.Error("Failed to read database", "error", err)
 	}
@@ -320,20 +292,6 @@ func (s *inMemoryStore) write() (err error) {
 		slog.Info("Saved database", "name", dbf, "size", info.Size(), "modtime", info.ModTime())
 	} else {
 		slog.Warn("Failed to stat database after save", "error", err)
-	}
-
-	// Upload to blob storage
-	if s.blobs != nil {
-		fd, err = os.Open(dbf)
-		if err != nil {
-			slog.Error("Failed to upload database to blob storage", "error", err)
-			return nil
-		}
-		defer fd.Close()
-		if err := s.blobs.Upload(context.Background(), s.objKey, fd); err != nil {
-			slog.Error("Failed to upload database to blob storage", "error", err)
-		}
-		slog.Info("Finished uploading database")
 	}
 
 	return nil
