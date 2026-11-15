@@ -46,7 +46,7 @@ Contract properties, all load-bearing:
   anet is updated or the toolchain moves past 1.27.3.
 - `go generate ./lib/api/auto/` must run before `go build`; `gui.files.go`
   is gitignored and never committed.
-- Per-platform `syncthing-<target>.zip` archives plus a verified `SHA256SUMS`.
+- Per-platform `syncthing-<target>.tar.xz` archives plus a verified `SHA256SUMS`.
 - Tag `release-${{ github.sha }}` is created at the triggering commit through
   the GitHub API, and `gh release create` passes `--verify-tag --prerelease`.
 - Only `actions/checkout`, `actions/setup-go`, `actions/upload-artifact`,
