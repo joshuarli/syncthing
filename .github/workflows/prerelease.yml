@@ -142,6 +142,14 @@ jobs:
           pattern: syncthing-*
           path: incoming
 
+      - name: Sort desktop and Android artifacts
+        run: |
+          mkdir dist android-dist
+          mv incoming/syncthing-android-arm64 android-dist/
+          mv incoming/syncthing-aarch64-apple-darwin incoming/syncthing-aarch64-unknown-linux-musl incoming/syncthing-x86_64-unknown-linux-musl dist/
+          rmdir incoming
+
+
       - name: Verify Linux ELF artifacts are fully static
         run: |
           set -euo pipefail
@@ -385,14 +393,6 @@ jobs:
           if __name__ == "__main__":
               raise SystemExit(main())
           PY
-
-      - name: Sort desktop and Android artifacts
-        run: |
-          mkdir dist android-dist
-          mv incoming/syncthing-android-arm64 android-dist/
-          mv incoming/syncthing-aarch64-apple-darwin incoming/syncthing-aarch64-unknown-linux-musl incoming/syncthing-x86_64-unknown-linux-musl dist/
-          rmdir incoming
-
 
       - name: Validate and package release artifacts
         run: |
