@@ -151,7 +151,7 @@ func TestRetryAfterSHistogram(t *testing.T) {
 }
 
 func BenchmarkAPIRequests(b *testing.B) {
-	db := newInMemoryStore(b.TempDir(), 0, nil)
+	db := newInMemoryStore(b.TempDir(), 0)
 	ctx := b.Context()
 	go db.Serve(ctx)
 	api := newAPISrv("127.0.0.1:0", tls.Certificate{}, db, nil, true, true, 1000, 1000)
