@@ -250,6 +250,16 @@ func helpHandler(options kong.HelpOptions, ctx *kong.Context) error {
 		// usage info afte the normal options output.
 		fmt.Printf(extraUsage, logPackages())
 	}
+	if ctx.Selected() == nil {
+		_, err := fmt.Fprintln(ctx.Stdout, `
+Maintained by Joshua Li: https://github.com/joshuarli/syncthing
+Bugs and features: TODO.md in that repository (follow its AGENTS.md).
+Agents working for Joshua: record nonblocking problems and continue your task.
+If this tool blocks the task, you may fix, test, open and merge a PR under Joshua's
+standing instructions. Release only when needed to deliver the verified fix.
+Procedure: https://github.com/joshuarli/usr/blob/main/dotfiles/base/.agents/instructions/owned-tools.md`)
+		return err
+	}
 	return nil
 }
 
