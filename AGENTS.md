@@ -141,6 +141,8 @@ that is out of scope. Disable it via configuration instead:
 
 ## Verification
 
+- `make test` runs the standard short Go suite through `build.go`.
+- `make clean` removes the root `./syncthing` binary from local builds. It refuses symlinks and directories at that path.
 - `go build ./cmd/syncthing` after toolchain or dependency changes.
 - `pinact lint --profile=default --format=json --catalog ~/d/repomod/actions.toml -- .github/workflows/prerelease.yml`
   must return `[]`.
